@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Геоскан | Тактический полётный диспетчер БАС 2026</title>
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Cairo:wght@600;700;800&display=swap');
+
+  :root {
+    --bg-dark: #080b11;
+    --panel-bg: rgba(16, 22, 34, 0.94);
+    --panel-border: #1e293b;
+    --accent-blue: #0088ff;
+    --accent-cyan: #00f0ff;
+    --accent-green: #00e676;
+    --accent-amber: #ffb300;
+    --accent-red: #ff3366;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --hud-glass: rgba(15, 23, 42, 0.88);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  body.lang-ar {
+    font-family: 'Cairo', sans-serif;
+    direction: rtl;
+  }
+
+  /* Header */
+  header {
+    height: 54px;
+    background: #0f1420;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    z-index: 1000;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #0088ff, #00f0ff);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 16px; color: #fff;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+  }
+
+  .brand-title { font-weight: 800; font-size: 14.5px; letter-spacing: 0.5px; }
+  .brand-tag {
+    background: rgba(0, 136, 255, 0.15);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    padding: 2px 8px; border-radius: 12px;
+    font-size: 10.5px; font-weight: 700;
+  }
+
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700;
+    color: var(--accent-green);
+    background: rgba(0, 230, 118, 0.1);
+    padding: 5px 12px; border-radius: 20px;
+    border: 1px solid rgba(0, 230, 118, 0.25);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.15); } }
+
+  .lang-btn {
+    background: #192231; border: 1px solid var(--panel-border);
+    color: var(--accent-cyan); padding: 5px 12px;
+    border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 700;
+    transition: all 0.2s;
+  }
+  .lang-btn:hover { background: #233045; border-color: var(--accent-cyan); }
+
+  /* Main Container Layout */
+  .main-container {
+    display: flex; flex: 1; height: calc(100vh - 54px); position: relative;
+  }
+
+  /* Left Sidebar Controls */
+  .sidebar {
+    width: 390px;
+    background: var(--panel-bg);
+    backdrop-filter: blur(12px);
+    border-right: 1px solid var(--panel-border);
+    display: flex; flex-direction: column;
+    z-index: 500; overflow-y: auto;
+  }
+
+  body.lang-ar .sidebar { border-right: none; border-left: 1px solid var(--panel-border); }
+
+  .panel-section { padding: 13px 16px; border-bottom: 1px solid var(--panel-border); }
+  .panel-title {
+    font-size: 11px; font-weight: 800; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 9px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* Segmented switch */
+  .segmented-switch {
+    display: flex; background: #0b0e14; padding: 3px;
+    border-radius: 8px; border: 1px solid var(--panel-border); margin-bottom: 6px;
+  }
+
+  .switch-btn {
+    flex: 1; padding: 8px 6px; border: none; background: transparent;
+    color: var(--text-secondary); font-size: 12px; font-weight: 700;
+    border-radius: 6px; cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+
+  .switch-btn.active {
+    background: linear-gradient(135deg, #0088ff, #00b4d8); color: #fff;
+    box-shadow: 0 2px 10px rgba(0, 136, 255, 0.4);
+  }
+
+  .form-group { margin-bottom: 9px; }
+  label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+
+  select, input[type="range"] { width: 100%; }
+  select {
+    background: #0b0f17; border: 1px solid var(--panel-border);
+    color: var(--text-primary); padding: 7px 10px;
+    border-radius: 6px; font-size: 12px; outline: none;
+  }
+
+  .range-container { display: flex; align-items: center; gap: 10px; }
+  .range-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 700; color: var(--accent-cyan); min-width: 65px;
+  }
+
+  /* Drone cards */
+  .drone-card {
+    background: #0b0f17; border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 8px 11px; margin-bottom: 7px;
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .drone-card:hover { border-color: rgba(0, 240, 255, 0.4); }
+  .drone-card.selected { border-color: var(--accent-blue); background: rgba(0, 136, 255, 0.08); }
+  .drone-info { flex: 1; }
+  .drone-name { font-size: 12.5px; font-weight: 700; display: flex; justify-content: space-between; }
+  .drone-meta { font-size: 10.5px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Feasibility Advisor Card */
+  .feasibility-card {
+    background: #080d16;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    transition: all 0.3s ease;
+  }
+  .feasibility-card.feasible {
+    border-color: rgba(0, 230, 118, 0.4);
+    background: rgba(0, 230, 118, 0.05);
+  }
+  .feasibility-card.infeasible {
+    border-color: rgba(255, 82, 82, 0.5);
+    background: rgba(255, 82, 82, 0.08);
+  }
+  .feasibility-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .feasibility-tag {
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag-feasible {
+    background: rgba(0, 230, 118, 0.15);
+    color: var(--accent-green);
+    border: 1px solid var(--accent-green);
+  }
+  .tag-infeasible {
+    background: rgba(255, 82, 82, 0.2);
+    color: #ff5252;
+    border: 1px solid #ff5252;
+  }
+  .feasibility-body {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .feasibility-to {
+    font-size: 10px;
+    color: var(--text-secondary);
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    padding-top: 5px;
+  }
+
+  /* Fleet Stepper Controls */
+  .stepper-box {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: #060910;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 2px 4px;
+    margin-left: auto;
+  }
+  .btn-step {
+    background: #111a28;
+    color: var(--accent-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 4px;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .btn-step:hover {
+    background: var(--accent-blue);
+    color: #fff;
+    border-color: var(--accent-blue);
+  }
+  .step-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    min-width: 18px;
+    text-align: center;
+  }
+  .fleet-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--accent-green);
+    background: rgba(0, 230, 118, 0.12);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+
+  .btn-calc {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg, #0088ff, #00d2ff);
+    color: #fff; border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 136, 255, 0.4);
+    transition: all 0.2s;
+  }
+  .btn-calc:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0, 136, 255, 0.6); }
+
+  /* Map */
+  #map { flex: 1; height: 100%; background: #070a0f; }
+
+  /* HUD Telemetry Overlay */
+  .hud-overlay {
+    position: absolute; top: 14px; right: 14px; width: 350px;
+    background: var(--hud-glass); backdrop-filter: blur(14px);
+    border: 1px solid var(--panel-border); border-radius: 12px;
+    padding: 15px; z-index: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.65);
+  }
+
+  body.lang-ar .hud-overlay { right: auto; left: 14px; }
+
+  .hud-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px;
+    font-size: 11.5px; font-weight: 800; color: var(--accent-cyan);
+  }
+
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 11px; }
+  .kpi-box { background: #0a0e17; border: 1px solid var(--panel-border); border-radius: 6px; padding: 7px; text-align: center; }
+  .kpi-val { font-family: 'JetBrains Mono', monospace; font-size: 15.5px; font-weight: 800; color: #fff; }
+  .kpi-label { font-size: 9.5px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Altitude deconfliction profile */
+  .alt-profile {
+    background: #0a0e17; border: 1px solid var(--panel-border); border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 11px;
+  }
+  .alt-bars { display: flex; gap: 8px; align-items: flex-end; height: 48px; padding-top: 6px; }
+  .alt-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+  .alt-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 8px; transition: height 0.4s; }
+  .alt-tag { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-secondary); margin-top: 3px; }
+
+  /* Sortie Gantt box */
+  .gantt-box {
+    background: #0a0e17; border: 1px solid var(--panel-border);
+    border-radius: 6px; padding: 9px; margin-bottom: 11px; max-height: 120px; overflow-y: auto;
+  }
+
+  .gantt-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 10.5px; }
+  .gantt-label { width: 85px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gantt-track { flex: 1; display: flex; height: 13px; background: #161e2b; border-radius: 3px; overflow: hidden; }
+  .gantt-flight { height: 100%; border-radius: 2px; }
+  .gantt-swap { background: repeating-linear-gradient(45deg, #ffb300, #ffb300 4px, #d49000 4px, #d49000 8px); height: 100%; border-radius: 2px; }
+
+  /* Sim controls */
+  .sim-panel {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 11px;
+    background: #0a0e17; border: 1px solid var(--panel-border); border-radius: 6px; padding: 6px 10px;
+  }
+  .btn-sim {
+    padding: 6px 10px; border-radius: 5px; border: 1px solid var(--accent-blue);
+    background: rgba(0, 136, 255, 0.15); color: var(--accent-cyan);
+    font-size: 11px; font-weight: 800; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-sim:hover { background: var(--accent-blue); color: #fff; }
+  .sim-status { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text-secondary); flex: 1; text-align: center; }
+
+  /* Export buttons */
+  .export-bar { display: flex; gap: 6px; margin-top: 7px; }
+  .btn-export {
+    flex: 1; padding: 7px 4px; background: #151d2a; border: 1px solid var(--panel-border);
+    color: var(--text-primary); border-radius: 6px; font-size: 10.5px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; text-align: center;
+  }
+  .btn-export:hover { background: #222d40; border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+  /* Toast Notification */
+  .toast {
+    position: fixed; bottom: 20px; right: 20px; z-index: 2000;
+    background: rgba(16, 24, 38, 0.95); border: 1px solid var(--accent-green);
+    color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 12px; font-weight: 700;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6); display: none; align-items: center; gap: 8px;
+    animation: fadeIn 0.3s forwards;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Custom animated drone marker */
+  .drone-marker-icon {
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s linear;
+  }
+
+  /* Completely hide Leaflet default attribution to eliminate all foreign flags/watermarks */
+  .leaflet-control-attribution {
+    display: none !important;
+  }
+
+  /* Fleet Layer Inspector floating box */
+  .fleet-layer-box {
+    position: absolute;
+    top: 14px;
+    left: 410px;
+    z-index: 650;
+    background: rgba(13, 20, 32, 0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  body.lang-ar .fleet-layer-box { left: auto; right: 410px; }
+
+  .fleet-layer-header {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--accent-cyan);
+    white-space: nowrap;
+    border-right: 1px solid rgba(255,255,255,0.12);
+    padding-right: 10px;
+  }
+  body.lang-ar .fleet-layer-header { border-right: none; border-left: 1px solid rgba(255,255,255,0.12); padding-right: 0; padding-left: 10px; }
+
+  .fleet-layer-items {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .layer-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-primary);
+  }
+  .layer-toggle-row input { cursor: pointer; }
+  .layer-bullet {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  /* Path anatomy legend floating card */
+  .path-legend-badge {
+    position: absolute;
+    bottom: 14px;
+    left: 410px;
+    z-index: 650;
+    background: rgba(13, 20, 32, 0.90);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 10.5px;
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  body.lang-ar .path-legend-badge { left: auto; right: 410px; }
+
+  /* Russian sovereign badge */
+  .russian-map-badge {
+    position: absolute;
+    bottom: 14px;
+    right: 380px;
+    z-index: 650;
+    background: rgba(10, 15, 25, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  body.lang-ar .russian-map-badge { right: auto; left: 380px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-logo">Г</div>
+    <div class="brand-title" id="tAppTitle">ГЕОСКАН | ТАКТИЧЕСКИЙ ДИСПЕТЧЕР БАС</div>
+    <span class="brand-tag">ХАКАТОН ЛЦТ 2026</span>
+  </div>
+
+  <div class="header-actions">
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span id="tApiStatus">BACKEND ONLINE :8000</span>
+    </div>
+  </div>
+</header>
+
+<div class="main-container">
+  <!-- Controls Panel -->
+  <div class="sidebar">
+    <!-- Criterion -->
+    <div class="panel-section">
+      <div class="panel-title">
+        <span id="tCritTitle">Критерий оптимизации</span>
+        <span style="color:var(--accent-green); font-size:10px;" id="tSavingsTag">-64.3% затрат ТО</span>
+      </div>
+      <div class="segmented-switch">
+        <button class="switch-btn active" id="btnMinTime" onclick="setCriterion('min_time')">
+          ⚡ Быстрее (Min Time)
+        </button>
+        <button class="switch-btn" id="btnMinWear" onclick="setCriterion('min_wear')">
+          🛡️ Бережнее (Min Wear)
+        </button>
+      </div>
+      <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" id="tCritDesc">
+        Параллельный вылет всего флота для завершения съёмки в рекордные сроки.
+      </div>
+    </div>
+
+    <!-- Weather -->
+    <div class="panel-section">
+      <div class="panel-title" id="tWeatherTitle">Метеоусловия и Ветер</div>
+      <div class="form-group">
+        <label id="tWindSpeed">Скорость ветра: <span class="range-val" id="windSpeedVal">6.0 м/с</span></label>
+        <div class="range-container">
+          <input type="range" id="windSpeed" min="0" max="14" step="0.5" value="6.0" oninput="updateWindSpeed(this.value)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label id="tWindDir">Направление ветра: <span class="range-val" id="windDirVal">180° (Юг)</span></label>
+        <div class="range-container">
+          <input type="range" id="windDir" min="0" max="359" step="15" value="180" oninput="updateWindDir(this.value)">
+        </div>
+      </div>
+      <div style="font-size: 11px; color: var(--accent-cyan); display: flex; justify-content: space-between; margin-bottom: 6px;" id="tOptimalStrip">
+        <span>💨 Расчётный угол галсов:</span>
+        <strong id="stripAngleText">0° (по ветру)</strong>
+      </div>
+      <div id="windLiveStats" style="font-size: 10.5px; background: rgba(0, 136, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 4px; padding: 4px 7px; color: var(--text-primary);">
+        💨 Ветер 6.0 м/с: расход АКБ <strong>+33%</strong> • Скорость <strong>-6%</strong>
+      </div>
+    </div>
+
+    <!-- Survey & Scenarios -->
+    <div class="panel-section">
+      <div class="panel-title" id="tSurveyTitle">Параметры съёмки и Сценарий</div>
+      <div class="form-group">
+        <label id="tSensorLabel">Полезная нагрузка</label>
+        <select id="surveyType" onchange="calculateMissionLive()">
+          <option value="rgb">Аэрофотосъёмка RGB (Sony RX1R II, 42 Мп)</option>
+          <option value="multispectral">Мультиспектральная (Геоскан Поллукс)</option>
+          <option value="thermal">Тепловизионная ИК (FLIR Duo Pro R)</option>
+          <option value="lidar">Лазерное сканирование (LiDAR АГМ-МС3)</option>
+          <option value="geophysical">Геофизика (Квантовый магнитометр)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="tScenarioLabel">Промышленный полигон и Регион</label>
+        <select id="scenarioPreset" onchange="loadPreset(this.value)">
+          <option value="oilfield">Нефтяное месторождение (Западная Сибирь, Сургут)</option>
+          <option value="agriculture">Агро-массив 3000 га (Кубань, Краснодарский край)</option>
+          <option value="pipeline">Горный газопровод (Северный Кавказ / Урал, 11 м/с)</option>
+        </select>
+      </div>
+
+      <!-- Real Geographic Region HUD -->
+      <div class="form-group" style="background:#070b12; border:1px solid var(--panel-border); border-radius:6px; padding:8px 9px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; font-size:10.5px; font-weight:700; color:var(--accent-cyan); margin-bottom:4px;">
+          <span id="tRegionLabel">📍 Локация:</span>
+          <span id="regionNameText">Западная Сибирь (Сургут)</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-secondary); margin-bottom:6px;">
+          <span>Шир: <strong id="valLat" style="color:#fff">61.2540°</strong></span>
+          <span>Долг: <strong id="valLon" style="color:#fff">73.4140°</strong></span>
+          <span>Рельеф: <strong id="valTerrain" style="color:var(--accent-green)">Тайга (H=45м)</strong></span>
+        </div>
+        <div style="display:flex; gap:5px;">
+          <input type="number" id="inpCustomLat" placeholder="Широта (Lat)" step="0.001" style="flex:1; background:#0b111c; border:1px solid var(--panel-border); color:#fff; font-size:10px; padding:4px 6px; border-radius:4px;">
+          <input type="number" id="inpCustomLon" placeholder="Долгота (Lon)" step="0.001" style="flex:1; background:#0b111c; border:1px solid var(--panel-border); color:#fff; font-size:10px; padding:4px 6px; border-radius:4px;">
+          <button class="btn-sim" style="padding:3px 8px; font-size:10px;" onclick="setCustomCoordinates()" id="btnSetCoords">Перейти</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:6px; margin-bottom:8px;">
+        <button class="btn-export" style="flex:1; border-color:var(--accent-cyan); color:var(--accent-cyan);" onclick="document.getElementById('fileUpload').click()" id="btnUploadFile">
+          📂 Загрузить GeoJSON
+        </button>
+        <input type="file" id="fileUpload" accept=".geojson,.json,.kml" style="display:none" onchange="handleFileUpload(event)">
+        <button class="btn-export" style="flex:1; border-color:var(--accent-green); color:var(--accent-green);" onclick="toggleSafetyLayers()" id="btnToggleSafety">
+          🪂 Снос парашюта
+        </button>
+      </div>
+      <button class="btn-export" style="width:100%; border-color:var(--accent-red); color:#ff6b8b;" onclick="injectLiveEmergencyNFZ()">
+        ⚠️ Ввести зону NOTAM NFZ (ОрВД)
+      </button>
+    </div>
+
+    <!-- Fleet Selection -->
+    <div class="panel-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div class="panel-title" style="margin-bottom:0;" id="tFleetTitle">Доступный флот «Геоскан»</div>
+        <span class="fleet-badge" id="totalFleetCountBadge">Всего: 3 борта</span>
+      </div>
+      
+      <div class="drone-card selected" id="c201">
+        <div class="drone-info">
+          <div class="drone-name"><span>Геоскан 201</span><span style="color:#00f0ff">Самолёт</span></div>
+          <div class="drone-meta">3 ч • 85 км/ч • Дубинс R≥45м • Снос парашюта</div>
+        </div>
+        <div class="stepper-box">
+          <button class="btn-step" onclick="changeDroneCount('geoscan_201', -1)">−</button>
+          <span class="step-count" id="count_geoscan_201">1</span>
+          <button class="btn-step" onclick="changeDroneCount('geoscan_201', 1)">+</button>
+        </div>
+      </div>
+
+      <div class="drone-card selected" id="c801">
+        <div class="drone-info">
+          <div class="drone-name"><span>Геоскан 801</span><span style="color:#00e676">Тяжёлый коптер</span></div>
+          <div class="drone-meta">45 мин • 45 км/ч • LiDAR/Магнитометр • VTOL</div>
+        </div>
+        <div class="stepper-box">
+          <button class="btn-step" onclick="changeDroneCount('geoscan_801', -1)">−</button>
+          <span class="step-count" id="count_geoscan_801">1</span>
+          <button class="btn-step" onclick="changeDroneCount('geoscan_801', 1)">+</button>
+        </div>
+      </div>
+
+      <div class="drone-card selected" id="cgem">
+        <div class="drone-info">
+          <div class="drone-name"><span>Геоскан Gemini</span><span style="color:#ffb300">Геодез-коптер</span></div>
+          <div class="drone-meta">40 мин • 36 км/ч • ГНСС RTK • VTOL</div>
+        </div>
+        <div class="stepper-box">
+          <button class="btn-step" onclick="changeDroneCount('geoscan_gemini', -1)">−</button>
+          <span class="step-count" id="count_geoscan_gemini">1</span>
+          <button class="btn-step" onclick="changeDroneCount('geoscan_gemini', 1)">+</button>
+        </div>
+      </div>
+
+      <button class="btn-export" style="width:100%; border-color:var(--accent-blue); color:var(--accent-cyan); margin-top:6px; font-weight:700;" onclick="applyAutoOptimalFleet()" id="btnAutoOptimal">
+        ⭐ Подобрать оптимальный флот (Парето)
+      </button>
+    </div>
+
+    <!-- Operational Constraints & Daylight Window -->
+    <div class="panel-section">
+      <div class="panel-title" id="tConstraintsTitle">Ограничения и Световой день</div>
+      
+      <div class="form-group">
+        <label id="tTimeWindowLabel">Окно до темноты / дедлайн: <span class="range-val" id="timeWindowVal">60 мин</span></label>
+        <div class="range-container">
+          <input type="range" id="inpTimeWindow" min="15" max="240" step="5" value="60" oninput="updateTimeWindow(this.value)">
+        </div>
+      </div>
+
+      <!-- Feasibility Advisor Card -->
+      <div class="feasibility-card feasible" id="feasibilityCard">
+        <div class="feasibility-header">
+          <span class="feasibility-tag tag-feasible" id="feasibilityTag">ВЫПОЛНИМО</span>
+          <span style="font-size:11px; font-weight:700; color:var(--accent-green);" id="feasibilityMargin">Запас: +36 мин</span>
+        </div>
+        <div class="feasibility-body" id="feasibilityText">
+          Миссия укладывается в доступное время. Задействовано 3 борта.
+        </div>
+        <div class="feasibility-to" id="feasibilityTo">
+          🔧 Нормы ТО: 201 — 80 вылетов | 801 — 160 ч полета
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="panel-section" style="border-bottom:none; margin-top:auto;">
+      <button class="btn-calc" onclick="calculateMissionLive()" id="btnCalculate">
+        🚀 РАССЧИТАТЬ МИССИЮ ФЛОТА
+      </button>
+    </div>
+  </div>
+
+  <!-- Interactive Map -->
+  <div id="map"></div>
+
+  <!-- Fleet Route Layer Filter Floating Box -->
+  <div class="fleet-layer-box" id="fleetLayerBox">
+    <div class="fleet-layer-header">
+      <span id="tFilterTitle">🧭 МАРШРУТЫ ФЛОТА</span>
+    </div>
+    <div class="fleet-layer-items" id="fleetLayerToggles">
+      <!-- Generated dynamically based on active drones -->
+    </div>
+  </div>
+
+  <!-- Path Anatomy Legend -->
+  <div class="path-legend-badge">
+    <span style="color:var(--accent-cyan); font-weight:800;">💡 Навигация:</span>
+    <span>• <strong>Галсы:</strong> полосы съёмки</span>
+    <span>• <strong>Петли разворота:</strong> Дубинс R≥45м</span>
+    <span>• <strong>Центр:</strong> обход зоны NFZ</span>
+  </div>
+
+  <!-- Russian Sovereign Badge -->
+  <div class="russian-map-badge">
+    🇷🇺 <span>Яндекс Карты (РФ) | Комплекс «Геоскан»</span>
+  </div>
+
+  <!-- HUD Telemetry & Simulation Overlay -->
+  <div class="hud-overlay">
+    <div class="hud-header">
+      <span id="tHudTitle">ТЕЛЕМЕТРИЯ И ПОКАЗАТЕЛИ МИССИИ</span>
+      <span style="color:var(--accent-green)">ГЛОНАСС / GPS OK</span>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-box">
+        <div class="kpi-val" id="hudMakespan">9.1 мин</div>
+        <div class="kpi-label" id="tKpi1">Длительность миссии</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val" id="hudCost">449 ₽</div>
+        <div class="kpi-label" id="tKpi2">Стоимость ТО и амортизации</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val" id="hudAirtime">18.4 мин</div>
+        <div class="kpi-label" id="tKpi3">Суммарный налёт</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val" style="color:var(--accent-green);" id="hudReserve">> 75%</div>
+        <div class="kpi-label" id="tKpi4">Резерв АКБ (>=20%)</div>
+      </div>
+    </div>
+
+    <!-- 4D Simulation Player -->
+    <div class="panel-title" style="margin-top:4px; margin-bottom:5px;" id="tSimTitle">4D Симулятор полёта флота</div>
+    <div class="sim-panel">
+      <button class="btn-sim" id="btnPlaySim" onclick="toggleSim()">▶️ Старт</button>
+      <button class="btn-sim" onclick="resetSim()">⏹️ Сброс</button>
+      <div class="sim-status" id="simStatus">T + 00:00 • 1x</div>
+    </div>
+    <input type="range" id="simScrubber" min="0" max="1000" value="0" style="width:100%; margin-bottom:8px; accent-color:var(--accent-cyan); cursor:pointer;" oninput="onScrubSim(this.value)" title="Таймлайн миссии">
+
+    <!-- Altitude Profile -->
+    <div class="panel-title" style="margin-top:6px; margin-bottom:5px;" id="tAltTitle">Эшелонирование высот (3D Deconfliction)</div>
+    <div class="alt-profile">
+      <div class="alt-bars" id="altBars">
+        <div class="alt-bar-col"><div class="alt-bar" style="height:75%; background:#00f0ff"></div><span class="alt-tag">201: 120м</span></div>
+        <div class="alt-bar-col"><div class="alt-bar" style="height:85%; background:#00e676"></div><span class="alt-tag">801: 130м</span></div>
+        <div class="alt-bar-col"><div class="alt-bar" style="height:95%; background:#ffb300"></div><span class="alt-tag">Gem: 140м</span></div>
+      </div>
+    </div>
+
+    <!-- Gantt Chart -->
+    <div class="panel-title" style="margin-top:6px; margin-bottom:5px;" id="tGanttTitle">График вылетов и смены АКБ (Gantt)</div>
+    <div class="gantt-box" id="ganttContainer">
+      <div class="gantt-row">
+        <span class="gantt-label">Геоскан 201:</span>
+        <div class="gantt-track"><div class="gantt-flight" style="width:100%; background:#00f0ff"></div></div>
+      </div>
+      <div class="gantt-row">
+        <span class="gantt-label">Геоскан 801:</span>
+        <div class="gantt-track"><div class="gantt-flight" style="width:70%; background:#00e676"></div><div class="gantt-swap" style="width:30%"></div></div>
+      </div>
+    </div>
+
+    <!-- Exports -->
+    <div class="panel-title" style="margin-top:6px; margin-bottom:5px;" id="tExportTitle">Экспорт полетных заданий</div>
+    <div class="export-bar" style="display:flex; gap:6px; margin-bottom:6px;">
+      <button class="btn-export" onclick="exportGeoJSON()">🗺️ GeoJSON</button>
+      <button class="btn-export" onclick="exportKML()">🌐 KML 2.2</button>
+    </div>
+    <div id="dynamicQgcButtons" style="display:flex; flex-direction:column; gap:4px;">
+      <button class="btn-export" style="border-color:var(--accent-cyan); color:var(--accent-cyan);" onclick="exportQGCPlan(0)">✈️ .plan (QGroundControl)</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span>✅</span>
+  <span id="toastMsg">Файл полетного задания успешно экспортирован!</span>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let map, polyLayer, nfzLayer, baseMarker;
+  let routeLayers = [];
+  let droneSimMarkers = [];
+  let lastMissionData = null;
+  let currentCriterion = 'min_time';
+  let simInterval = null;
+  let simProgress = 0; // 0.0 to 1.0
+
+  let activeBaseWGS84 = [61.2540, 73.4140]; // Defaults to Western Siberia oilfield (Surgut)
+  const palette = ['#00f0ff', '#00e676', '#ffb300', '#e040fb', '#ff5252', '#40c4ff', '#b2ff59', '#ffd740'];
+  let calcDebounceTimer = null;
+
+  const presets = {
+    oilfield: {
+      nameRu: "Западная Сибирь (Сургут)",
+      nameAr: "غرب سيبيريا (حقول النفط)",
+      base: [61.2540, 73.4140],
+      terrainRu: "Тайга, болота (H=45м)",
+      terrainAr: "غابات تايبا ومستنقعات (H=45م)",
+      polygon: [[-400, -300], [600, -300], [700, 200], [500, 500], [-400, 500]],
+      nfz: [[[100, 50], [250, 50], [250, 200], [100, 200]]]
+    },
+    agriculture: {
+      nameRu: "Южная Кубань (Краснодар)",
+      nameAr: "سهول كوبان الزراعية (كراسنودار)",
+      base: [45.0355, 38.9753],
+      terrainRu: "Чернозёмные равнины (H=30м)",
+      terrainAr: "سهول منبسطة 3000 هكتار (H=30م)",
+      polygon: [[-1000, -800], [1500, -800], [1500, 1000], [-1000, 1000]],
+      nfz: []
+    },
+    pipeline: {
+      nameRu: "Северный Кавказ (Сочи / Горы)",
+      nameAr: "جبال القوقاز الوعرة (أنابيب الغاز)",
+      base: [43.6028, 40.2742],
+      terrainRu: "Высокогорье, лес (H=850м, 11 м/с)",
+      terrainAr: "جبال وعرة ورياح 11 م/ث (H=850م)",
+      polygon: [[-600, -100], [800, -100], [1000, 100], [-600, 100]],
+      nfz: [[[100, -50], [300, -50], [300, 50], [100, 50]]]
+    }
+  };
+
+  let activePolygon = presets.oilfield.polygon;
+  let activeNFZ = presets.oilfield.nfz;
+
+  let fleetRouteLayers = {};
+  let yandexMapLayer, yandexSatLayer, darkTacticalLayer, esriSatLayer;
+
+  function initMap() {
+    map = L.map('map', { zoomControl: false }).setView(activeBaseWGS84, 13);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // 1. Dark Tactical Base (Esri Canvas Dark - zero watermark, clean HUD theme)
+    darkTacticalLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18
+    }).addTo(map);
+
+    // 2. Yandex Satellite (Ортофотоплан РФ)
+    yandexSatLayer = L.tileLayer('https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={z}&scale=1&lang=ru_RU', {
+      maxZoom: 19
+    });
+
+    // 3. Yandex Navigation Map (Схема РФ)
+    yandexMapLayer = L.tileLayer('https://core-renderer-tiles.maps.yandex.net/tiles?l=map&x={x}&y={y}&z={z}&scale=1&lang=ru_RU', {
+      maxZoom: 19
+    });
+
+    // 4. World High-Res Satellite
+    esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19
+    });
+
+    L.control.layers({
+      "🎯 Тёмная тактическая основа (ЦУП)": darkTacticalLayer,
+      "🛰️ Яндекс Спутник (РФ)": yandexSatLayer,
+      "🗺️ Яндекс Карта (Схема РФ)": yandexMapLayer,
+      "🌍 Спутник Ultra-HD": esriSatLayer
+    }, null, { position: 'topright' }).addTo(map);
+
+    // Draggable Base Station (ВП/ПП)
+    baseMarker = L.circleMarker(activeBaseWGS84, {
+      radius: 9, color: '#00f0ff', fillColor: '#ffffff', fillOpacity: 1, weight: 2
+    }).bindPopup("<b>ВП/ПП БАЗА</b><br>Точка старта и посадки флота").addTo(map);
+
+    // Shift-click to move base station anywhere on Earth
+    map.on('click', function(e) {
+      if (e.originalEvent.shiftKey) {
+        activeBaseWGS84 = [e.latlng.lat, e.latlng.lng];
+        updateRegionDisplay({
+          nameRu: "Точка клика на карте",
+          nameAr: "موقع محدد بالماوس",
+          terrainRu: "Пользовательский рельеф",
+          terrainAr: "تضاريس محددة يدوياً"
+        });
+        baseMarker.setLatLng(activeBaseWGS84);
+        renderMapGeometry();
+        calculateMissionLive();
+        if (showSafety) updateSafetyLayers();
+        showToast('База ВП/ПП перемещена в точку клика!');
+      }
+    });
+
+    updateRegionDisplay(presets.oilfield);
+    renderMapGeometry();
+    calculateMissionLive();
+  }
+
+  function toggleRouteVisibility(droneId, isVisible) {
+    if (fleetRouteLayers[droneId]) {
+      if (isVisible) {
+        if (!map.hasLayer(fleetRouteLayers[droneId])) map.addLayer(fleetRouteLayers[droneId]);
+      } else {
+        if (map.hasLayer(fleetRouteLayers[droneId])) map.removeLayer(fleetRouteLayers[droneId]);
+      }
+    }
+  }
+
+  function toggleNFZVisibility(isVisible) {
+    if (nfzLayer) {
+      if (isVisible) {
+        if (!map.hasLayer(nfzLayer)) map.addLayer(nfzLayer);
+      } else {
+        if (map.hasLayer(nfzLayer)) map.removeLayer(nfzLayer);
+      }
+    }
+  }
+
+  function metersToWGS(x, y) {
+    const mPerDegLat = 111320.0;
+    const mPerDegLon = 111320.0 * Math.cos(activeBaseWGS84[0] * Math.PI / 180);
+    return [activeBaseWGS84[0] + (y / mPerDegLat), activeBaseWGS84[1] + (x / mPerDegLon)];
+  }
+
+  function renderMapGeometry() {
+    if (polyLayer) map.removeLayer(polyLayer);
+    if (nfzLayer) map.removeLayer(nfzLayer);
+
+    const latlngs = activePolygon.map(pt => metersToWGS(pt[0], pt[1]));
+    polyLayer = L.polygon(latlngs, {
+      color: '#0088ff', weight: 2, fillColor: '#0088ff', fillOpacity: 0.12, dashArray: '4, 4'
+    }).addTo(map);
+
+    if (activeNFZ && activeNFZ.length > 0) {
+      const nfzLatLngs = activeNFZ.map(poly => poly.map(pt => metersToWGS(pt[0], pt[1])));
+      nfzLayer = L.polygon(nfzLatLngs, {
+        color: '#ff3366', weight: 2, fillColor: '#ff3366', fillOpacity: 0.25
+      }).bindPopup("<b>ЗОНА ОГРАНИЧЕНИЯ (NFZ)</b><br>Запретная зона для полётов").addTo(map);
+    }
+
+    map.fitBounds(polyLayer.getBounds(), { padding: [60, 60] });
+  }
+
+  function updateRegionDisplay(sc) {
+    document.getElementById('regionNameText').innerText = sc.nameRu;
+    document.getElementById('valLat').innerText = activeBaseWGS84[0].toFixed(4) + '°';
+    document.getElementById('valLon').innerText = activeBaseWGS84[1].toFixed(4) + '°';
+    document.getElementById('valTerrain').innerText = sc.terrainRu;
+    document.getElementById('inpCustomLat').value = activeBaseWGS84[0].toFixed(4);
+    document.getElementById('inpCustomLon').value = activeBaseWGS84[1].toFixed(4);
+  }
+
+  function setCustomCoordinates() {
+    const lat = parseFloat(document.getElementById('inpCustomLat').value);
+    const lon = parseFloat(document.getElementById('inpCustomLon').value);
+    if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      return alert('Введите корректные географические координаты!');
+    }
+    activeBaseWGS84 = [lat, lon];
+    updateRegionDisplay({
+      nameRu: "Пользовательская точка",
+      terrainRu: "Локальный рельеф"
+    });
+
+    if (baseMarker) baseMarker.setLatLng(activeBaseWGS84);
+    map.flyTo(activeBaseWGS84, 13, { duration: 1.2 });
+    renderMapGeometry();
+    calculateMissionLive();
+    if (showSafety) updateSafetyLayers();
+    showToast(`Флот перебазирован: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  }
+
+  function loadPreset(k) {
+    const sc = presets[k] || presets.oilfield;
+    activePolygon = sc.polygon;
+    activeNFZ = sc.nfz;
+    activeBaseWGS84 = sc.base;
+    updateRegionDisplay(sc);
+
+    if (baseMarker) baseMarker.setLatLng(activeBaseWGS84);
+    map.flyTo(activeBaseWGS84, 13, { duration: 1.2 });
+    renderMapGeometry();
+    calculateMissionLive();
+    if (showSafety) updateSafetyLayers();
+  }
+
+  function setCriterion(crit) {
+    currentCriterion = crit;
+    const btnTime = document.getElementById('btnMinTime');
+    const btnWear = document.getElementById('btnMinWear');
+    if (btnTime) btnTime.classList.toggle('active', crit === 'min_time');
+    if (btnWear) btnWear.classList.toggle('active', crit === 'min_wear');
+    const desc = document.getElementById('tCritDesc');
+    if (desc) {
+      desc.innerText = crit === 'min_time' 
+        ? 'Параллельный вылет всего доступного флота для завершения съёмки в рекордные сроки.'
+        : 'Минимизация износа и затрат на ТО: одиночный вылет высокоэффективного борта (до -64.3% затрат).';
+    }
+    calculateMissionLive();
+  }
+
+  const droneCounts = {
+    geoscan_201: 1,
+    geoscan_801: 1,
+    geoscan_gemini: 1
+  };
+
+  function changeDroneCount(droneId, delta) {
+    const current = droneCounts[droneId] || 0;
+    const newVal = Math.max(0, Math.min(5, current + delta));
+    droneCounts[droneId] = newVal;
+    const el = document.getElementById('count_' + droneId);
+    if (el) el.innerText = newVal;
+
+    const card = document.getElementById(droneId === 'geoscan_201' ? 'c201' : (droneId === 'geoscan_801' ? 'c801' : 'cgem'));
+    if (card) card.classList.toggle('selected', newVal > 0);
+
+    updateTotalFleetBadge();
+    calculateMissionLive();
+  }
+
+  function updateTotalFleetBadge() {
+    const total = Object.values(droneCounts).reduce((a, b) => a + b, 0);
+    const badge = document.getElementById('totalFleetCountBadge');
+    if (badge) {
+      badge.innerText = `Всего: ${total} ${total === 1 ? 'борт' : (total < 5 ? 'борта' : 'бортов')}`;
+    }
+  }
+
+  function applyAutoOptimalFleet() {
+    if (!lastMissionData || !lastMissionData.feasibility || !lastMissionData.feasibility.optimal_fleet) {
+      calculateMissionLive();
+      return;
+    }
+    const opt = lastMissionData.feasibility.optimal_fleet;
+    const models = opt.recommended_models;
+    droneCounts.geoscan_201 = models.geoscan_201 !== undefined ? models.geoscan_201 : 1;
+    droneCounts.geoscan_801 = models.geoscan_801 !== undefined ? models.geoscan_801 : 0;
+    droneCounts.geoscan_gemini = models.geoscan_gemini !== undefined ? models.geoscan_gemini : 0;
+
+    if (droneCounts.geoscan_201 === 0 && droneCounts.geoscan_801 === 0 && droneCounts.geoscan_gemini === 0) {
+      droneCounts.geoscan_201 = 1;
+    }
+
+    document.getElementById('count_geoscan_201').innerText = droneCounts.geoscan_201;
+    document.getElementById('count_geoscan_801').innerText = droneCounts.geoscan_801;
+    document.getElementById('count_geoscan_gemini').innerText = droneCounts.geoscan_gemini;
+
+    document.getElementById('c201').classList.toggle('selected', droneCounts.geoscan_201 > 0);
+    document.getElementById('c801').classList.toggle('selected', droneCounts.geoscan_801 > 0);
+    document.getElementById('cgem').classList.toggle('selected', droneCounts.geoscan_gemini > 0);
+
+    updateTotalFleetBadge();
+    showToast(`Оптимальный флот применён: ${opt.reasoning}`);
+    calculateMissionLive();
+  }
+
+  async function calculateMissionLive() {
+    routeLayers.forEach(l => map.removeLayer(l));
+    routeLayers = [];
+    resetSim();
+
+    const selectedDrones = [];
+    for (const [dId, count] of Object.entries(droneCounts)) {
+      for (let c = 1; c <= count; c++) {
+        selectedDrones.push(`${dId}_#${c}`);
+      }
+    }
+
+    const payload = {
+      survey_polygon: activePolygon,
+      selected_drone_ids: selectedDrones.length ? selectedDrones : ['geoscan_201_#1'],
+      survey_type: document.getElementById('surveyType').value,
+      criterion: currentCriterion,
+      wind_speed_ms: parseFloat(document.getElementById('windSpeed').value),
+      wind_direction_deg: parseFloat(document.getElementById('windDir').value),
+      base_point: [0.0, 0.0],
+      origin_lat: activeBaseWGS84[0],
+      origin_lon: activeBaseWGS84[1],
+      nfz_polygons: activeNFZ.length ? activeNFZ : null,
+      max_time_window_min: parseFloat(document.getElementById('inpTimeWindow') ? document.getElementById('inpTimeWindow').value : 60)
+    };
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      lastMissionData = data;
+      renderMissionResults(data);
+    } catch (err) {
+      console.warn('Backend connection failed:', err);
+    }
+  }
+
+  function updateTimeWindow(val) {
+    if (document.getElementById('timeWindowVal')) {
+      document.getElementById('timeWindowVal').innerText = val + ' мин';
+    }
+    clearTimeout(calcDebounceTimer);
+    calcDebounceTimer = setTimeout(() => {
+      calculateMissionLive();
+    }, 120);
+  }
+
+  function updateWindTelemetryBanner() {
+    const spd = parseFloat(document.getElementById('windSpeed').value);
+    const banner = document.getElementById('windLiveStats');
+    if (banner) {
+      const vLossPct = Math.min(45, Math.round((spd / 23.6) * 35));
+      const pDrainPct = Math.round(((spd * 0.038) + (spd * spd * 0.0022)) * 100);
+      banner.innerHTML = spd <= 0.5 
+        ? '🍃 Штиль: номинальная скорость и базовый расход АКБ'
+        : `💨 Ветер ${spd.toFixed(1)} м/с: расход АКБ <strong>+${pDrainPct}%</strong> • Скорость <strong>-${vLossPct}%</strong>`;
+    }
+  }
+
+  function updateWindSpeed(val) {
+    const el = document.getElementById('windSpeedVal');
+    if (el) el.innerText = parseFloat(val).toFixed(1) + ' м/с';
+    updateWindTelemetryBanner();
+
+    clearTimeout(calcDebounceTimer);
+    calcDebounceTimer = setTimeout(() => {
+      calculateMissionLive();
+      if (showSafety) updateSafetyLayers();
+    }, 120);
+  }
+
+  function updateWindDir(val) {
+    const deg = parseInt(val);
+    const dirs = ['Север (N)', 'СВ (NE)', 'Восток (E)', 'ЮВ (SE)', 'Юг (S)', 'ЮЗ (SW)', 'Запад (W)', 'СЗ (NW)'];
+    const idx = Math.round(deg / 45) % 8;
+    const el = document.getElementById('windDirVal');
+    if (el) el.innerText = `${deg}° (${dirs[idx]})`;
+    
+    const optAngle = (deg % 180);
+    const stripEl = document.getElementById('stripAngleText');
+    if (stripEl) stripEl.innerText = `${optAngle}° (по ветру)`;
+    updateWindTelemetryBanner();
+
+    clearTimeout(calcDebounceTimer);
+    calcDebounceTimer = setTimeout(() => {
+      calculateMissionLive();
+      if (showSafety) updateSafetyLayers();
+    }, 120);
+  }
+
+  function renderMissionResults(data) {
+    document.getElementById('hudMakespan').innerText = data.summary.makespan_min + ' мин';
+    document.getElementById('hudCost').innerText = data.summary.total_wear_cost_rub + ' ₽';
+    document.getElementById('hudAirtime').innerText = data.summary.total_flight_time_min + ' мин';
+
+    // Render Feasibility Advisor
+    if (data.feasibility) {
+      const f = data.feasibility;
+      const card = document.getElementById('feasibilityCard');
+      const tag = document.getElementById('feasibilityTag');
+      const margin = document.getElementById('feasibilityMargin');
+      const text = document.getElementById('feasibilityText');
+      const to = document.getElementById('feasibilityTo');
+
+      if (card && tag && margin && text) {
+        if (f.is_feasible) {
+          card.className = "feasibility-card feasible";
+          tag.className = "feasibility-tag tag-feasible";
+          tag.innerText = "ВЫПОЛНИМО";
+          const rem = (parseFloat(document.getElementById('inpTimeWindow').value || 60) - f.makespan_min).toFixed(1);
+          margin.style.color = "var(--accent-green)";
+          margin.innerText = `Запас: +${rem} мин`;
+          text.innerText = f.recommendation;
+        } else {
+          card.className = "feasibility-card infeasible";
+          tag.className = "feasibility-tag tag-infeasible";
+          tag.innerText = "НЕВЫПОЛНИМО";
+          const diff = (f.makespan_min - parseFloat(document.getElementById('inpTimeWindow').value || 60)).toFixed(1);
+          margin.style.color = "#ff5252";
+          margin.innerText = `Превышение: -${diff} мин`;
+          text.innerText = f.recommendation;
+        }
+      }
+
+      if (to && f.maintenance_norm) {
+        to.innerText = "🔧 Нормативы ТО «Геоскан»: 201 — каждые 80 вылетов | 801 — каждые 160 ч";
+      }
+    }
+
+    // Clear previous route layers
+    Object.values(fleetRouteLayers).forEach(l => {
+      if (map.hasLayer(l)) map.removeLayer(l);
+    });
+    fleetRouteLayers = {};
+    routeLayers.forEach(l => map.removeLayer(l));
+    routeLayers = [];
+
+    const palette = ['#00f0ff', '#00e676', '#ffb300', '#e040fb', '#ff5252', '#40c4ff', '#b2ff59', '#ffd740'];
+    const droneIcons = { fixed_wing: '✈️', multirotor: '🚁' };
+
+    // Clear containers
+    const altContainer = document.getElementById('altBars');
+    altContainer.innerHTML = '';
+    const ganttContainer = document.getElementById('ganttContainer');
+    ganttContainer.innerHTML = '';
+    const togglesContainer = document.getElementById('fleetLayerToggles');
+    togglesContainer.innerHTML = '';
+    const qgcContainer = document.getElementById('dynamicQgcButtons');
+    qgcContainer.innerHTML = '';
+
+    let minReserve = 100;
+
+    data.assignments.forEach((drone, idx) => {
+      const color = palette[idx % palette.length];
+      const fullFlightPts = drone.waypoints;
+      drone.full_mission_waypoints = fullFlightPts;
+      const latlngs = fullFlightPts.map(pt => metersToWGS(pt[0], pt[1]));
+      const isFixed = drone.drone_type === 'fixed_wing';
+
+      const polyline = L.polyline(latlngs, {
+        color: color, 
+        weight: isFixed ? 3.5 : 3.0, 
+        opacity: 0.9, 
+        dashArray: isFixed ? null : (drone.drone_id === 'geoscan_gemini' ? '6, 6' : '3, 6')
+      }).bindPopup(`
+        <div style="font-family:sans-serif; min-width:180px;">
+          <div style="font-weight:bold; color:${color}; font-size:13px; margin-bottom:4px;">
+            ${droneIcons[drone.drone_type] || '🚁'} ${drone.drone_name}
+          </div>
+          <div>Тип: <b>${isFixed ? 'Самолёт (БЛА)' : 'Мультиротор VTOL'}</b></div>
+          <div>Налёт: <b>${drone.flight_duration_min} мин</b></div>
+          <div>Дистанция: <b>${drone.total_distance_km} км</b></div>
+          <div>Остаток АКБ: <b>${drone.battery_reserve_pct}%</b></div>
+          <div>Высота: <b>${drone.altitude_m} м</b></div>
+          <div style="margin-top:5px; font-size:10px; color:#94a3b8;">
+            ${isFixed ? '• Развороты Дубинса (R≥45м) для защиты от сваливания' : '• Регулярные галсы площадной съёмки'}
+          </div>
+        </div>
+      `).addTo(map);
+
+      routeLayers.push(polyline);
+      fleetRouteLayers[drone.drone_id] = polyline;
+
+      // Add checkbox to Layer Filter Box on map
+      const row = document.createElement('label');
+      row.className = 'layer-toggle-row';
+      row.innerHTML = `
+        <input type="checkbox" id="layerToggle_${drone.drone_id}" checked onchange="toggleRouteVisibility('${drone.drone_id}', this.checked)">
+        <span class="layer-bullet" style="background:${color};"></span>
+        <span>${droneIcons[drone.drone_type] || '🚁'} ${drone.drone_name.replace('Геоскан ', '')}</span>
+      `;
+      togglesContainer.appendChild(row);
+
+      // Add individual .plan export button
+      const qgcBtn = document.createElement('button');
+      qgcBtn.className = 'btn-export';
+      qgcBtn.style.borderColor = color;
+      qgcBtn.style.color = color;
+      qgcBtn.style.textAlign = 'left';
+      qgcBtn.style.paddingLeft = '8px';
+      qgcBtn.innerHTML = `📥 ${droneIcons[drone.drone_type] || '✈️'} <strong>${drone.drone_name}</strong> (.plan)`;
+      qgcBtn.onclick = () => exportQGCPlan(idx);
+      qgcContainer.appendChild(qgcBtn);
+
+      if (drone.battery_reserve_pct < minReserve) minReserve = drone.battery_reserve_pct;
+
+      // Altitude bar
+      const col = document.createElement('div');
+      col.className = 'alt-bar-col';
+      const pct = Math.min(100, Math.max(20, (drone.altitude_m / 200) * 100));
+      col.innerHTML = `<div class="alt-bar" style="height:${pct}%; background:${color}"></div><span class="alt-tag">${drone.drone_name.replace('Геоскан ', '')}: ${drone.altitude_m}м</span>`;
+      altContainer.appendChild(col);
+
+      // Gantt row
+      const gRow = document.createElement('div');
+      gRow.className = 'gantt-row';
+      const isMulti = drone.is_multi_sortie;
+      const flWidth = isMulti ? 65 : 100;
+      const swWidth = isMulti ? 35 : 0;
+      gRow.innerHTML = `
+        <span class="gantt-label" title="${drone.drone_name}">${drone.drone_name}:</span>
+        <div class="gantt-track">
+          <div class="gantt-flight" style="width:${flWidth}%; background:${color}" title="Полёт: ${drone.flight_duration_min} мин"></div>
+          ${swWidth > 0 ? `<div class="gantt-swap" style="width:${swWidth}%" title="Смена АКБ: 10 мин"></div>` : ''}
+        </div>
+      `;
+      ganttContainer.appendChild(gRow);
+    });
+
+    // Add All .plan batch download button if multiple drones
+    if (data.assignments.length > 1) {
+      const allBtn = document.createElement('button');
+      allBtn.className = 'btn-export';
+      allBtn.style.borderColor = 'var(--accent-cyan)';
+      allBtn.style.color = '#fff';
+      allBtn.style.background = 'rgba(0, 240, 255, 0.15)';
+      allBtn.innerHTML = `📦 Скачать ВСЕ полетные планы (${data.assignments.length} шт.)`;
+      allBtn.onclick = exportAllQGC;
+      qgcContainer.appendChild(allBtn);
+    }
+
+    // Add NFZ toggle to layer filter
+    const nfzRow = document.createElement('label');
+    nfzRow.className = 'layer-toggle-row';
+    nfzRow.innerHTML = `
+      <input type="checkbox" id="layerToggle_nfz" checked onchange="toggleNFZVisibility(this.checked)">
+      <span class="layer-bullet" style="background:#ff3366;"></span>
+      <span>🚫 Зона ограничения (NFZ)</span>
+    `;
+    togglesContainer.appendChild(nfzRow);
+
+    document.getElementById('hudReserve').innerText = minReserve.toFixed(1) + '%';
+  }
+
+  let safetyLayers = [];
+  let showSafety = false;
+
+  async function toggleSafetyLayers() {
+    showSafety = !showSafety;
+    const btn = document.getElementById('btnToggleSafety');
+    if (showSafety) {
+      btn.style.background = 'rgba(0, 230, 118, 0.25)';
+      btn.style.borderColor = '#00e676';
+      await updateSafetyLayers();
+      showToast('Конус сноса парашюта и Резервная ВП/ПП включены');
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.borderColor = 'var(--accent-green)';
+      clearSafetyLayers();
+      showToast('Слои безопасности скрыты');
+    }
+  }
+
+  function clearSafetyLayers() {
+    safetyLayers.forEach(l => map.removeLayer(l));
+    safetyLayers = [];
+  }
+
+  async function updateSafetyLayers() {
+    clearSafetyLayers();
+    if (!showSafety) return;
+
+    const windSpd = parseFloat(document.getElementById('windSpeed').value);
+    const windDir = parseFloat(document.getElementById('windDir').value);
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/landing/alternate_site', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base_point: [0.0, 0.0],
+          wind_speed_ms: windSpd,
+          wind_direction_deg: windDir,
+          altitude_m: 150.0,
+          descent_rate_ms: 5.0,
+          nfz_polygons: activeNFZ
+        })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') return;
+
+      const pRec = data.parachute_recovery;
+      const altSite = data.alternate_landing_site;
+
+      // 1. Touchdown point
+      const touchLatLng = metersToWGS(pRec.touchdown_point[0], pRec.touchdown_point[1]);
+      
+      // 2. Parachute drift line from Base to Touchdown
+      const driftLine = L.polyline([activeBaseWGS84, touchLatLng], {
+        color: '#ff9100', weight: 3, dashArray: '6, 6'
+      }).bindPopup(`<b>СНОС ПАРАШЮТА ГЕОСКАН 201</b><br>Дистанция сноса: ${pRec.drift_distance_m}м<br>Азимут сноса: ${pRec.drift_bearing_deg}°<br>Время снижения: ${pRec.descent_time_sec}с`).addTo(map);
+      safetyLayers.push(driftLine);
+
+      // 3. Dispersion circle around Touchdown
+      const dispCircle = L.circle(touchLatLng, {
+        radius: pRec.landing_dispersion_radius_m,
+        color: '#ff9100', fillColor: '#ff9100', fillOpacity: 0.22, weight: 1.5
+      }).bindPopup(`<b>ЗОНА ПРИЗЕМЛЕНИЯ ПАРАШЮТА</b><br>Радиус рассеивания: ${pRec.landing_dispersion_radius_m}м`).addTo(map);
+      safetyLayers.push(dispCircle);
+
+      // 4. Alternate Landing Site Marker
+      const altLatLng = metersToWGS(altSite.coordinates[0], altSite.coordinates[1]);
+      const altIcon = L.divIcon({
+        html: `<div style="background:#00e676; color:#000; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:0 0 12px #00e676; border:2px solid #fff; font-weight:bold;">🛡️</div>`,
+        className: 'alt-landing-icon',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+      const altMarker = L.marker(altLatLng, { icon: altIcon })
+        .bindPopup(`<b>${altSite.name}</b><br>Дистанция от базы: ${altSite.distance_from_base_m}м<br>Курс захода: ${altSite.safe_approach_heading_deg}°<br>Чистая зона вне NFZ`)
+        .addTo(map);
+      safetyLayers.push(altMarker);
+
+    } catch (e) {
+      console.warn("Could not load alternate landing safety layers:", e);
+    }
+  }
+
+  // File Upload Handler (GeoJSON/JSON)
+  function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const json = JSON.parse(e.target.result);
+        const res = await fetch('http://127.0.0.1:8000/api/upload_geojson', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(json)
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.survey_polygon.length >= 3) {
+          activePolygon = data.survey_polygon;
+          activeNFZ = data.nfz_polygons || [];
+          renderMapGeometry();
+          calculateMissionLive();
+          showToast(`Полигон успешно загружен! (${data.vertex_count} вершин)`);
+        } else {
+          alert('Не удалось распознать замкнутый полигон в GeoJSON!');
+        }
+      } catch (err) {
+        alert('Ошибка парсинга файла: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // Simulation Timeline Scrubber
+  function onScrubSim(val) {
+    if (simInterval) {
+      clearInterval(simInterval);
+      simInterval = null;
+      document.getElementById('btnPlaySim').innerText = '▶️ Старт';
+    }
+    simProgress = parseFloat(val) / 1000.0;
+    renderSimFrame();
+  }
+
+  // 4D Simulation Engine
+  function toggleSim() {
+    if (simInterval) {
+      clearInterval(simInterval);
+      simInterval = null;
+      document.getElementById('btnPlaySim').innerText = '▶️ Старт';
+    } else {
+      if (!lastMissionData || !lastMissionData.assignments || !lastMissionData.assignments.length) {
+        calculateMissionLive().then(() => {
+          if (lastMissionData && lastMissionData.assignments && lastMissionData.assignments.length) {
+            startSimPlayback();
+          }
+        });
+        return;
+      }
+      startSimPlayback();
+    }
+  }
+
+  function startSimPlayback() {
+    if (simProgress >= 0.99) {
+      simProgress = 0;
+      document.getElementById('simScrubber').value = 0;
+    }
+    document.getElementById('btnPlaySim').innerText = '⏸️ Пауза';
+    if (simInterval) clearInterval(simInterval);
+    simInterval = setInterval(updateSimStep, 50);
+  }
+
+  function resetSim() {
+    if (simInterval) {
+      clearInterval(simInterval);
+      simInterval = null;
+    }
+    simProgress = 0;
+    document.getElementById('simScrubber').value = 0;
+    document.getElementById('btnPlaySim').innerText = '▶️ Старт';
+    document.getElementById('simStatus').innerText = 'T + 00:00 • 1x';
+    droneSimMarkers.forEach(m => map.removeLayer(m));
+    droneSimMarkers = [];
+  }
+
+  function updateSimStep() {
+    simProgress += 0.005;
+    if (simProgress > 1.0) {
+      resetSim();
+      return;
+    }
+    document.getElementById('simScrubber').value = Math.floor(simProgress * 1000);
+    renderSimFrame();
+  }
+
+  function renderSimFrame() {
+    if (!lastMissionData || !lastMissionData.assignments) return;
+
+    const elapsedTotalSec = (lastMissionData.summary.makespan_min * 60) * simProgress;
+    const mins = Math.floor(elapsedTotalSec / 60);
+    const secs = Math.floor(elapsedTotalSec % 60);
+    document.getElementById('simStatus').innerText = `T + ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+
+    droneSimMarkers.forEach(m => map.removeLayer(m));
+    droneSimMarkers = [];
+
+    lastMissionData.assignments.forEach((drone, idx) => {
+      const wpts = drone.full_mission_waypoints || drone.waypoints;
+      if (!wpts || wpts.length < 2) return;
+      const targetIdx = Math.min(wpts.length - 1, Math.floor(simProgress * (wpts.length - 1)));
+      const pt = wpts[targetIdx];
+      const latlng = metersToWGS(pt[0], pt[1]);
+      const color = palette[idx % palette.length];
+      const isFixed = drone.drone_type === 'fixed_wing';
+      const totalWps = wpts.length;
+
+      let flightPhase = "📸 Аэрофотосъёмка галсов";
+      if (targetIdx <= 2) {
+        flightPhase = isFixed ? "🛫 Катапультный старт на базе ВП/ПП" : "🛫 Вертикальный взлёт VTOL на базе";
+      } else if (targetIdx < Math.min(15, Math.floor(totalWps * 0.15))) {
+        flightPhase = "✈️ Транзитный перелёт к полигону (набор эшелона)";
+      } else if (targetIdx >= Math.max(totalWps - 15, Math.floor(totalWps * 0.85)) && targetIdx < totalWps - 2) {
+        flightPhase = "🔄 Возврат на базу ВП/ПП (снижение)";
+      } else if (targetIdx >= totalWps - 2) {
+        flightPhase = isFixed ? "🪂 Парашютная посадка на базе ВП/ПП" : "🛬 Посадка VTOL на базе ВП/ПП";
+      }
+
+      // Calculate dynamic flight heading angle (aircraft points in direction of flight)
+      let headingDeg = 0;
+      if (targetIdx < wpts.length - 1) {
+        const pNext = wpts[targetIdx + 1];
+        headingDeg = (Math.atan2(pNext[0] - pt[0], pNext[1] - pt[1]) * 180 / Math.PI + 360) % 360;
+      } else if (targetIdx > 0) {
+        const pPrev = wpts[targetIdx - 1];
+        headingDeg = (Math.atan2(pt[0] - pPrev[0], pt[1] - pPrev[1]) * 180 / Math.PI + 360) % 360;
+      }
+
+      // Fixed wing rotated 45 deg base icon adjustment
+      const rotAngle = isFixed ? (headingDeg + 45) : headingDeg;
+      const iconHtml = isFixed
+        ? `<div style="transform: rotate(${rotAngle}deg); font-size: 22px; filter: drop-shadow(0 0 7px ${color}); transition: transform 0.06s linear;">✈️</div>`
+        : `<div style="transform: rotate(${headingDeg}deg); font-size: 22px; filter: drop-shadow(0 0 7px ${color}); transition: transform 0.06s linear;">🚁</div>`;
+
+      const customIcon = L.divIcon({
+        html: iconHtml,
+        className: 'drone-marker-icon',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+
+      const currAlt = pt[2] !== undefined ? Math.round(pt[2]) : drone.altitude_m;
+      const usedPct = simProgress * (100 - drone.battery_reserve_pct);
+      const currBatt = Math.max(5, Math.round(100 - usedPct));
+
+      const m = L.marker(latlng, { icon: customIcon }).bindTooltip(
+        `<b>${drone.drone_name}</b><br>Фаза: <b>${flightPhase}</b><br>АКБ: ${currBatt}% • Эшелон: ${currAlt}м<br>Скорость: ${drone.groundspeed_ms} м/с`,
+        { permanent: false }
+      );
+      m.addTo(map);
+      droneSimMarkers.push(m);
+    });
+  }
+
+  // Live Emergency NOTAM NFZ Injection
+  async function injectLiveEmergencyNFZ() {
+    if (!lastMissionData) return alert('Сначала рассчитайте миссию!');
+    
+    // Emergency NFZ at center of survey
+    const newNFZ = [
+      [200, 100], [350, 100], [350, 250], [200, 250]
+    ];
+    activeNFZ.push(newNFZ);
+    renderMapGeometry();
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/telemetry/inject_nfz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: lastMissionData,
+          new_nfz: newNFZ
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.updated_plan) {
+        lastMissionData = data.updated_plan;
+        routeLayers.forEach(l => map.removeLayer(l));
+        routeLayers = [];
+        renderMissionResults(lastMissionData);
+        showToast('⚠️ Экстренная зона NFZ введена! Траектории пересчитаны в воздухе.');
+      }
+    } catch (e) {
+      calculateMissionLive();
+    }
+  }
+
+  // File Download Helpers
+  function downloadFile(content, filename, type) {
+    const blob = new Blob([content], { type: type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    showToast(`Файл ${filename} успешно сохранён!`);
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    document.getElementById('toastMsg').innerText = msg;
+    t.style.display = 'flex';
+    setTimeout(() => { t.style.display = 'none'; }, 3500);
+  }
+
+  async function exportGeoJSON() {
+    if (!lastMissionData) return alert('Сначала рассчитайте миссию!');
+    try {
+      const lat = activeBaseWGS84[0];
+      const lon = activeBaseWGS84[1];
+      const res = await fetch(`http://127.0.0.1:8000/api/export/geojson?origin_lat=${lat}&origin_lon=${lon}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...lastMissionData,
+          origin_lat: lat,
+          origin_lon: lon
+        })
+      });
+      const data = await res.json();
+      downloadFile(JSON.stringify(data, null, 2), `geoscan_fleet_${lat.toFixed(2)}_${lon.toFixed(2)}.geojson`, 'application/json');
+    } catch (e) {
+      downloadFile(JSON.stringify(lastMissionData, null, 2), 'geoscan_fleet.geojson', 'application/json');
+    }
+  }
+
+  async function exportKML() {
+    if (!lastMissionData) return alert('Сначала рассчитайте миссию!');
+    try {
+      const lat = activeBaseWGS84[0];
+      const lon = activeBaseWGS84[1];
+      const res = await fetch(`http://127.0.0.1:8000/api/export/kml?origin_lat=${lat}&origin_lon=${lon}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...lastMissionData,
+          origin_lat: lat,
+          origin_lon: lon
+        })
+      });
+      const data = await res.json();
+      downloadFile(data.kml, `geoscan_fleet_${lat.toFixed(2)}_${lon.toFixed(2)}.kml`, 'application/vnd.google-earth.kml+xml');
+    } catch (err) {
+      alert("Ошибка экспорта KML: " + err);
+    }
+  }
+
+  async function exportQGCPlan(droneIndex = 0) {
+    if (!lastMissionData || !lastMissionData.assignments || !lastMissionData.assignments.length) return alert('Сначала рассчитайте миссию!');
+    try {
+      const targetDrone = lastMissionData.assignments[droneIndex] || lastMissionData.assignments[0];
+      const lat = activeBaseWGS84[0];
+      const lon = activeBaseWGS84[1];
+      const payload = {
+        ...targetDrone,
+        origin_lat: lat,
+        origin_lon: lon
+      };
+      const res = await fetch(`http://127.0.0.1:8000/api/export/qgc?origin_lat=${lat}&origin_lon=${lon}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      downloadFile(JSON.stringify(data, null, 2), `${targetDrone.drone_id}_${lat.toFixed(2)}_${lon.toFixed(2)}.plan`, 'application/json');
+    } catch (err) {
+      alert("Ошибка экспорта .plan: " + err);
+    }
+  }
+
+  async function exportAllQGC() {
+    if (!lastMissionData || !lastMissionData.assignments || !lastMissionData.assignments.length) return alert('Сначала рассчитайте миссию!');
+    for (let i = 0; i < lastMissionData.assignments.length; i++) {
+      await exportQGCPlan(i);
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+
+  window.onload = initMap;
+</script>
+</body>
+</html>

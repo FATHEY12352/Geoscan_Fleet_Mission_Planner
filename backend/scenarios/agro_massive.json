@@ -1,0 +1,16 @@
+{
+    "survey_polygon": [
+        [0.0, 0.0],
+        [3000.0, 0.0],
+        [3000.0, 2000.0],
+        [0.0, 2000.0]
+    ],
+    "selected_drone_ids": ["geoscan_201", "geoscan_gemini"],
+    "survey_type": "multispectral",
+    "criterion": "min_wear",
+    "wind_speed_ms": 3.0,
+    "wind_direction_deg": 270.0,
+    "base_point": [1500.0, -200.0],
+    "target_gsd_cm": 8.0,
+    "nfz_polygons": null
+}

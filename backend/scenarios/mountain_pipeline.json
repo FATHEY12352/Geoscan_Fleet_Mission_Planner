@@ -1,0 +1,16 @@
+{
+    "survey_polygon": [
+        [0.0, 0.0],
+        [4000.0, 500.0],
+        [4000.0, 700.0],
+        [0.0, 200.0]
+    ],
+    "selected_drone_ids": ["geoscan_201"],
+    "survey_type": "lidar",
+    "criterion": "min_time",
+    "wind_speed_ms": 12.0,
+    "wind_direction_deg": 90.0,
+    "base_point": [0.0, -100.0],
+    "target_gsd_cm": 3.0,
+    "nfz_polygons": null
+}
