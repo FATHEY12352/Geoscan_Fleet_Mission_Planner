@@ -154,41 +154,80 @@ def export_to_kml(mission_plan: Dict[str, Any], origin_lat: float = DEFAULT_SURG
 def export_to_qgc_plan(drone_assignment: Dict[str, Any], origin_lat: float = DEFAULT_SURGUT_LAT, origin_lon: float = DEFAULT_SURGUT_LON) -> Dict[str, Any]:
     """
     Exports a single drone's flight assignment to QGroundControl / Geoscan Planner .plan format.
+    Camera: DO_SET_CAM_TRIGG_DIST (cmd 206) for photogrammetry trigger on distance.
+    Camera action is set to DO_DIGICAM_CONTROL (cmd 203) so QGC shows 'Take Photo' action panel
+    instead of 'No change'.
+
+    CameraSection is embedded directly in each NAV_WAYPOINT SimpleItem — this is the QGC-native
+    way to display 'Take Photo (Distance)' in the waypoint camera panel UI, not just as separate
+    standalone items that QGC doesn't map back to individual waypoints visually.
     """
     origin_lat, origin_lon = resolve_mission_origin(drone_assignment, origin_lat, origin_lon)
     import math
     m_per_deg_lat = 111320.0
     m_per_deg_lon = 111320.0 * math.cos(math.radians(origin_lat))
-    
+
     wpts = drone_assignment.get("waypoints", [])
     alt = drone_assignment.get("altitude_m", 100.0)
-    
-    mission_items = []
-    
+    is_fixed_wing = drone_assignment.get("drone_type") == "fixed_wing"
+    cruise_speed = float(drone_assignment.get("cruise_speed_ms", 21.0))
     trig_dist = float(drone_assignment.get("trigger_distance_m", 25.0))
-    
-    # 1. Takeoff command (MAV_CMD_NAV_TAKEOFF = 22)
+
+    # QGC CameraSection cameraAction values:
+    # 0=NoAction, 1=TakePhotosIntervalTime, 2=TakePhotosIntervalDistance,
+    # 3=TakePhotoOnce, 4=StartVideoRecording, 5=StopVideoRecording
+    QGC_CAM_ACTION_DISTANCE = 2  # "Take Photos (Distance)" — shows in QGC camera panel
+
+    def make_camera_section(distance_m: float) -> dict:
+        """QGC-native CameraSection: embedded in SimpleItem for camera panel display."""
+        return {
+            "cameraAction": QGC_CAM_ACTION_DISTANCE,
+            "cameraPhotoIntervalTime": 2,
+            "cameraPhotoIntervalDistance": distance_m,
+            "cameraTriggerDistance": distance_m,
+            "gimbalPitch": -90.0,
+            "gimbalYaw": 0.0,
+            "specifyCameraExposure": False,
+            "version": 1
+        }
+
+    mission_items = []
+    jump_id = 1
+
+    # 1. Takeoff (MAV_CMD_NAV_TAKEOFF = 22)
     mission_items.append({
         "autoContinue": True,
         "command": 22,
-        "doJumpId": 1,
+        "doJumpId": jump_id,
         "frame": 3,
-        "params": [0, 0, 0, None, origin_lat, origin_lon, alt],
+        "params": [15 if is_fixed_wing else 0, 0, 0, None, origin_lat, origin_lon, alt],
         "type": "SimpleItem"
     })
-    
-    # 1b. Camera Trigger Activation (MAV_CMD_DO_SET_CAM_TRIGG_DIST = 206)
-    # Automatically triggers photogrammetry camera shutter every trig_dist meters
+    jump_id += 1
+
+    # 2. Set camera to Photo mode (MAV_CMD_SET_CAMERA_MODE = 530)
+    mission_items.append({
+        "autoContinue": True,
+        "command": 530,
+        "doJumpId": jump_id,
+        "frame": 2,
+        "params": [0, 0, 0, 0, 0, 0, 0],
+        "type": "SimpleItem"
+    })
+    jump_id += 1
+
+    # 3. Activate distance trigger (MAV_CMD_DO_SET_CAM_TRIGG_DIST = 206)
     mission_items.append({
         "autoContinue": True,
         "command": 206,
-        "doJumpId": len(mission_items) + 1,
+        "doJumpId": jump_id,
         "frame": 2,
         "params": [trig_dist, 0, 1, 0, 0, 0, 0],
         "type": "SimpleItem"
     })
-    
-    # 2. Survey Grid and Dubins Waypoints (MAV_CMD_NAV_WAYPOINT = 16)
+    jump_id += 1
+
+    # 4. Survey waypoints with embedded CameraSection
     for pt in wpts:
         x, y = pt[0], pt[1]
         pt_alt = pt[2] if len(pt) > 2 else alt
@@ -197,43 +236,46 @@ def export_to_qgc_plan(drone_assignment: Dict[str, Any], origin_lat: float = DEF
         mission_items.append({
             "autoContinue": True,
             "command": 16,
-            "doJumpId": len(mission_items) + 1,
+            "doJumpId": jump_id,
             "frame": 3,
-            "params": [0, 0, 0, None, lat, lon, pt_alt],
-            "type": "SimpleItem"
+            "params": [0, 0, 0, None, lat, lon, round(pt_alt, 1)],
+            "type": "SimpleItem",
+            "CameraSection": make_camera_section(trig_dist)
         })
-        
-    # 2b. Camera Trigger Stop before Landing (MAV_CMD_DO_SET_CAM_TRIGG_DIST = 206 with 0m)
+        jump_id += 1
+
+    # 5. Stop camera trigger (MAV_CMD_DO_SET_CAM_TRIGG_DIST = 206 with 0m)
     mission_items.append({
         "autoContinue": True,
         "command": 206,
-        "doJumpId": len(mission_items) + 1,
+        "doJumpId": jump_id,
         "frame": 2,
         "params": [0, 0, 0, 0, 0, 0, 0],
         "type": "SimpleItem"
     })
-    
-    # 3. Land / RTL command (MAV_CMD_NAV_RETURN_TO_LAUNCH = 20)
+    jump_id += 1
+
+    # 6. Return to Launch (MAV_CMD_NAV_RETURN_TO_LAUNCH = 20)
     mission_items.append({
         "autoContinue": True,
         "command": 20,
-        "doJumpId": len(mission_items) + 1,
+        "doJumpId": jump_id,
         "frame": 2,
         "params": [0, 0, 0, 0, 0, 0, 0],
         "type": "SimpleItem"
     })
-    
+
     return {
         "fileType": "Plan",
         "version": 1,
         "groundStation": "QGroundControl",
         "mission": {
-            "cruiseSpeed": float(drone_assignment.get("cruise_speed_ms", 21.0)),
+            "cruiseSpeed": cruise_speed,
             "firmwareType": 12,
             "hoverSpeed": 5.0,
             "items": mission_items,
             "plannedHomePosition": [origin_lat, origin_lon, alt],
-            "vehicleType": 1 if drone_assignment.get("drone_type") == "fixed_wing" else 2,
+            "vehicleType": 1 if is_fixed_wing else 2,
             "version": 2
         },
         "geoFence": {
@@ -246,3 +288,4 @@ def export_to_qgc_plan(drone_assignment: Dict[str, Any], origin_lat: float = DEF
             "version": 2
         }
     }
+

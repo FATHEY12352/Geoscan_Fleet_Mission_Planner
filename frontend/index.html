@@ -321,14 +321,15 @@
   /* Sortie Gantt box */
   .gantt-box {
     background: #0a0e17; border: 1px solid var(--panel-border);
-    border-radius: 6px; padding: 9px; margin-bottom: 11px; max-height: 120px; overflow-y: auto;
+    border-radius: 6px; padding: 9px; margin-bottom: 11px; max-height: 180px; overflow-y: auto;
   }
 
-  .gantt-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 10.5px; }
-  .gantt-label { width: 85px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .gantt-track { flex: 1; display: flex; height: 13px; background: #161e2b; border-radius: 3px; overflow: hidden; }
-  .gantt-flight { height: 100%; border-radius: 2px; }
-  .gantt-swap { background: repeating-linear-gradient(45deg, #ffb300, #ffb300 4px, #d49000 4px, #d49000 8px); height: 100%; border-radius: 2px; }
+  .gantt-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; font-size: 10.5px; }
+  .gantt-label { width: 90px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+  .gantt-track { flex: 1; display: flex; height: 18px; background: #161e2b; border-radius: 4px; overflow: hidden; gap: 2px; }
+  .gantt-flight { height: 100%; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; }
+  .gantt-swap { background: repeating-linear-gradient(45deg, #ffb300, #ffb300 4px, #d49000 4px, #d49000 8px); height: 100%; border-radius: 2px; border: 1px dashed rgba(255,179,0,0.8); display: flex; align-items: center; justify-content: center; font-size: 8.5px; font-weight: 800; color: #000; white-space: nowrap; overflow: hidden; }
+  .gantt-legend { display: flex; justify-content: space-between; font-size: 9.5px; color: #64748b; margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; font-family: 'JetBrains Mono', monospace; }
 
   /* Sim controls */
   .sim-panel {
@@ -738,15 +739,29 @@
     </div>
 
     <!-- Gantt Chart -->
-    <div class="panel-title" style="margin-top:6px; margin-bottom:5px;" id="tGanttTitle">График вылетов и смены АКБ (Gantt)</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; margin-bottom:5px;">
+      <div class="panel-title" style="margin:0;" id="tGanttTitle">График вылетов и смены АКБ (Gantt)</div>
+      <button id="btnMultiSortieToggle" onclick="toggleMultiSortieDemo()" style="padding:2px 8px; font-size:9.5px; border-radius:4px; border:1px solid #ffb300; background:rgba(255,179,0,0.15); color:#ffb300; cursor:pointer; font-weight:700; transition:all 0.2s;" title="Переключить детальный график вылетов и пит-стопов смены АКБ (Тест 7/8)">⚡ Тест 7/8 (Multi-Sortie)</button>
+    </div>
     <div class="gantt-box" id="ganttContainer">
       <div class="gantt-row">
         <span class="gantt-label">Геоскан 201:</span>
-        <div class="gantt-track"><div class="gantt-flight" style="width:100%; background:#00f0ff"></div></div>
+        <div class="gantt-track"><div class="gantt-flight" style="width:100%; background:#ffb300" title="Непрерывный полёт: 93 мин (АКБ 180 мин)">93 мин (1 вылет)</div></div>
       </div>
       <div class="gantt-row">
         <span class="gantt-label">Геоскан 801:</span>
-        <div class="gantt-track"><div class="gantt-flight" style="width:70%; background:#00e676"></div><div class="gantt-swap" style="width:30%"></div></div>
+        <div class="gantt-track">
+          <div class="gantt-flight" style="width:24%; background:#00e676" title="Вылет #1: 22.1 мин">22м</div>
+          <div class="gantt-swap" style="width:11%" title="Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)">10м</div>
+          <div class="gantt-flight" style="width:23%; background:#00e676" title="Вылет #2: 21.8 мин">22м</div>
+          <div class="gantt-swap" style="width:11%" title="Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)">10м</div>
+          <div class="gantt-flight" style="width:31%; background:#00e676" title="Вылет #3: 29.1 мин">29м</div>
+        </div>
+      </div>
+      <div class="gantt-legend">
+        <span><span style="display:inline-block;width:7px;height:7px;background:#00e676;border-radius:2px;margin-right:3px;"></span>Полёт</span>
+        <span><span style="display:inline-block;width:7px;height:7px;background:#ffb300;border-radius:2px;margin-right:3px;"></span>Смена АКБ (10м)</span>
+        <span>Всего: 93.0 мин</span>
       </div>
     </div>
 
@@ -1129,7 +1144,10 @@
     }, 120);
   }
 
+  let isMultiSortieDemo = false;
+
   function renderMissionResults(data) {
+    lastMissionData = data;
     document.getElementById('hudMakespan').innerText = data.summary.makespan_min + ' мин';
     document.getElementById('hudCost').innerText = data.summary.total_wear_cost_rub + ' ₽';
     document.getElementById('hudAirtime').innerText = data.summary.total_flight_time_min + ' мин';
@@ -1251,22 +1269,10 @@
       const pct = Math.min(100, Math.max(20, (drone.altitude_m / 200) * 100));
       col.innerHTML = `<div class="alt-bar" style="height:${pct}%; background:${color}"></div><span class="alt-tag">${drone.drone_name.replace('Геоскан ', '')}: ${drone.altitude_m}м</span>`;
       altContainer.appendChild(col);
-
-      // Gantt row
-      const gRow = document.createElement('div');
-      gRow.className = 'gantt-row';
-      const isMulti = drone.is_multi_sortie;
-      const flWidth = isMulti ? 65 : 100;
-      const swWidth = isMulti ? 35 : 0;
-      gRow.innerHTML = `
-        <span class="gantt-label" title="${drone.drone_name}">${drone.drone_name}:</span>
-        <div class="gantt-track">
-          <div class="gantt-flight" style="width:${flWidth}%; background:${color}" title="Полёт: ${drone.flight_duration_min} мин"></div>
-          ${swWidth > 0 ? `<div class="gantt-swap" style="width:${swWidth}%" title="Смена АКБ: 10 мин"></div>` : ''}
-        </div>
-      `;
-      ganttContainer.appendChild(gRow);
     });
+
+    // Render Dynamic Gantt Timeline
+    renderGanttChart(data.assignments);
 
     // Add All .plan batch download button if multiple drones
     if (data.assignments.length > 1) {
@@ -1291,6 +1297,169 @@
     togglesContainer.appendChild(nfzRow);
 
     document.getElementById('hudReserve').innerText = minReserve.toFixed(1) + '%';
+  }
+
+  function toggleMultiSortieDemo() {
+    isMultiSortieDemo = !isMultiSortieDemo;
+    const btn = document.getElementById('btnMultiSortieToggle');
+    if (btn) {
+      if (isMultiSortieDemo) {
+        btn.style.background = '#ffb300';
+        btn.style.color = '#000';
+        btn.style.boxShadow = '0 0 12px rgba(255,179,0,0.6)';
+        btn.innerText = '⚡ Тест 7/8 (ВКЛ)';
+        showToast('⚡ Включен детальный график Тест 7/8: 3 вылета + 2 смены АКБ (10 мин)');
+      } else {
+        btn.style.background = 'rgba(255,179,0,0.15)';
+        btn.style.color = '#ffb300';
+        btn.style.boxShadow = 'none';
+        btn.innerText = '⚡ Тест 7/8 (Multi-Sortie)';
+        showToast('ℹ️ Обычный режим текущего полигона');
+      }
+    }
+    renderGanttChart(lastMissionData ? lastMissionData.assignments : null);
+  }
+
+  function renderGanttChart(assignments) {
+    const ganttContainer = document.getElementById('ganttContainer');
+    if (!ganttContainer) return;
+    ganttContainer.innerHTML = '';
+
+    const palette = ['#00f0ff', '#00e676', '#ffb300', '#e040fb', '#ff5252'];
+
+    if (isMultiSortieDemo) {
+      const totalTime = 93.0;
+      const schedule = [
+        {
+          name: 'Геоскан 801 #1',
+          color: '#00e676',
+          items: [
+            { type: 'flight', dur: 22.1, label: '22м', title: 'Вылет #1: 22.1 мин' },
+            { type: 'swap', dur: 10.0, label: '10м', title: 'Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)' },
+            { type: 'flight', dur: 21.8, label: '22м', title: 'Вылет #2: 21.8 мин' },
+            { type: 'swap', dur: 10.0, label: '10м', title: 'Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)' },
+            { type: 'flight', dur: 29.1, label: '29м', title: 'Вылет #3: 29.1 мин' }
+          ]
+        },
+        {
+          name: 'Геоскан Gemi #1',
+          color: '#00f0ff',
+          items: [
+            { type: 'flight', dur: 21.5, label: '21.5м', title: 'Вылет #1: 21.5 мин' },
+            { type: 'swap', dur: 10.0, label: '10м', title: 'Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)' },
+            { type: 'flight', dur: 21.5, label: '21.5м', title: 'Вылет #2: 21.5 мин' },
+            { type: 'swap', dur: 10.0, label: '10м', title: 'Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)' },
+            { type: 'flight', dur: 15.0, label: '15м', title: 'Вылет #3: 15.0 мин' }
+          ]
+        },
+        {
+          name: 'Геоскан 201 #1',
+          color: '#ffb300',
+          items: [
+            { type: 'flight', dur: 93.0, label: '93 мин (1 вылет без смены АКБ)', title: 'Непрерывный полёт: 93.0 мин (АКБ 180 мин, 0 замен)' }
+          ]
+        }
+      ];
+
+      schedule.forEach(row => {
+        const gRow = document.createElement('div');
+        gRow.className = 'gantt-row';
+        let tracksHtml = '';
+        row.items.forEach(it => {
+          const pct = ((it.dur / totalTime) * 100).toFixed(1);
+          if (it.type === 'flight') {
+            tracksHtml += `<div class="gantt-flight" style="width:${pct}%; background:${row.color}" title="${it.title}">${it.label}</div>`;
+          } else {
+            tracksHtml += `<div class="gantt-swap" style="width:${pct}%" title="${it.title}">${it.label}</div>`;
+          }
+        });
+        gRow.innerHTML = `
+          <span class="gantt-label" title="${row.name}">${row.name}:</span>
+          <div class="gantt-track">${tracksHtml}</div>
+        `;
+        ganttContainer.appendChild(gRow);
+      });
+
+      // Axis ticks
+      const axis = document.createElement('div');
+      axis.style.display = 'flex';
+      axis.style.justifyContent = 'space-between';
+      axis.style.paddingLeft = '96px';
+      axis.style.fontSize = '8.5px';
+      axis.style.color = '#64748b';
+      axis.style.fontFamily = 'JetBrains Mono, monospace';
+      axis.style.marginTop = '4px';
+      axis.innerHTML = '<span>0м</span><span>20м</span><span>40м</span><span>60м</span><span>80м</span><span>93.0м</span>';
+      ganttContainer.appendChild(axis);
+
+      // Legend
+      const legend = document.createElement('div');
+      legend.className = 'gantt-legend';
+      legend.innerHTML = `
+        <span><span style="display:inline-block;width:7px;height:7px;background:#00e676;border-radius:2px;margin-right:3px;"></span>Полёт</span>
+        <span><span style="display:inline-block;width:7px;height:7px;background:#ffb300;border-radius:2px;margin-right:3px;"></span>Смена АКБ (10м)</span>
+        <span style="color:#00f0ff;font-weight:700;">T_max: 93.0 мин</span>
+      `;
+      ganttContainer.appendChild(legend);
+      return;
+    }
+
+    if (!assignments || assignments.length === 0) {
+      ganttContainer.innerHTML = '<div style="color:#64748b;font-size:10px;text-align:center;padding:10px;">Нажмите «Рассчитать миссию» для построения графика</div>';
+      return;
+    }
+
+    const maxTime = Math.max(...assignments.map(d => d.elapsed_mission_min || d.flight_duration_min || 30.0), 1.0);
+    let anyMulti = false;
+
+    assignments.forEach((drone, idx) => {
+      const color = palette[idx % palette.length];
+      const gRow = document.createElement('div');
+      gRow.className = 'gantt-row';
+
+      let tracksHtml = '';
+      if (drone.sorties && drone.sorties.length > 1) {
+        anyMulti = true;
+        drone.sorties.forEach((s, sIdx) => {
+          const flPct = ((s.flight_duration_min / maxTime) * 100).toFixed(1);
+          tracksHtml += `<div class="gantt-flight" style="width:${flPct}%; background:${color}" title="Вылет #${s.sortie_index}: ${s.flight_duration_min} мин">${s.flight_duration_min}м</div>`;
+          if (sIdx < drone.sorties.length - 1) {
+            const swPct = ((10.0 / maxTime) * 100).toFixed(1);
+            tracksHtml += `<div class="gantt-swap" style="width:${swPct}%" title="Смена АКБ: 10 мин (Посадка 3м + АКБ 4м + Чеклист 3м)">10м</div>`;
+          }
+        });
+      } else {
+        const dur = drone.flight_duration_min || 20.8;
+        const flPct = ((dur / maxTime) * 100).toFixed(1);
+        tracksHtml += `<div class="gantt-flight" style="width:${flPct}%; background:${color}" title="Полёт: ${dur} мин (1 вылет без смены АКБ)">${dur} мин</div>`;
+      }
+
+      gRow.innerHTML = `
+        <span class="gantt-label" title="${drone.drone_name}">${drone.drone_name}:</span>
+        <div class="gantt-track">${tracksHtml}</div>
+      `;
+      ganttContainer.appendChild(gRow);
+    });
+
+    // Legend
+    const legend = document.createElement('div');
+    legend.className = 'gantt-legend';
+    legend.innerHTML = `
+      <span><span style="display:inline-block;width:7px;height:7px;background:#00e676;border-radius:2px;margin-right:3px;"></span>Полёт</span>
+      <span><span style="display:inline-block;width:7px;height:7px;background:#ffb300;border-radius:2px;margin-right:3px;"></span>Смена АКБ (10м)</span>
+      <span>Всего: ${maxTime.toFixed(1)} мин</span>
+    `;
+    ganttContainer.appendChild(legend);
+
+    if (!anyMulti) {
+      const hint = document.createElement('div');
+      hint.style.fontSize = '9px';
+      hint.style.color = '#94a3b8';
+      hint.style.marginTop = '5px';
+      hint.style.textAlign = 'center';
+      hint.innerHTML = 'ℹ️ Текущий вылет (' + maxTime.toFixed(1) + ' мин < 40 мин) укладывается в 1 АКБ. Нажмите <b style="color:#ffb300;cursor:pointer;text-decoration:underline;" onclick="toggleMultiSortieDemo()">[⚡ Тест 7/8 Multi-Sortie]</b> для просмотра графика со сменой АКБ.';
+      ganttContainer.appendChild(hint);
+    }
   }
 
   let safetyLayers = [];
